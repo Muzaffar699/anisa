@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Календарь бронирования квартир</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #dbeafe, #eff6ff);
+      margin: 0;
+      padding: 20px;
+      color: #333;
+    }
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+      font-size: 28px;
+      color: #1e40af;
+    }
+    .controls {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    select, button, input {
+      font-size: 16px;
+      padding: 8px 14px;
+      margin: 5px;
+      border: none;
+      border-radius: 6px;
+      background: #e0f2fe;
+      color: #1e3a8a;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .calendar {
+      overflow-x: auto;
+      border-radius: 10px;
+      background: #ffffff;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      min-width: 1200px;
+    }
+    th, td {
+      border: 1px solid #e5e7eb;
+      text-align: center;
+      padding: 5px;
+      font-size: 13px;
+      height: 32px;
+      position: relative;
+    }
+    th {
+      background: #f1f5f9;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      font-weight: 600;
+      color: #111827;
+    }
+    .room-name {
+      background: #f3f4f6;
+      font-weight: bold;
+      position: sticky;
+      left: 0;
+      z-index: 1;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .room-name:hover {
+      background: #dbeafe;
+    }
+    .cell {
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .cell:hover {
+      background: #e0f2fe;
+    }
+    .occupied {
+      color: #fff;
+      font-weight: bold;
+      border-radius: 4px;
+    }
+    .occupied.full {
+      background: #4caf50;
+    }
+    .occupied.partial {
+      background: #ffa726;
+    }
+    .occupied.none {
+      background: #f44336;
+    }
+    .occupied span {
+      display: block;
+      font-size: 11px;
+      line-height: 1.2;
+    }
+    .room-color-0 { color: #dc2626; }
+    .room-color-1 { color: #16a34a; }
+    .room-color-2 { color: #2563eb; }
+    .room-color-3 { color: #d97706; }
+    .room-color-4 { color: #7c3aed; }
+    .room-color-5 { color: #059669; }
+    .room-color-6 { color: #be123c; }
+
+    .modal {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 10;
+    }
+    .modal-content {
+      background: #ffffff;
+      padding: 20px;
+      width: 320px;
+      border-radius: 10px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+    }
+    .modal-content input {
+      width: 100%;
+      padding: 8px;
+      margin: 6px 0;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+    }
+    .modal-content button {
+      width: 48%;
+      padding: 10px;
+      border: none;
+      color: #fff;
+      margin-top: 10px;
+      cursor: pointer;
+      border-radius: 6px;
+      font-weight: bold;
+    }
+    .modal-content .save {
+      background: #10b981;
+    }
+    .modal-content .delete {
+      background: #ef4444;
+    }
+    .export-btn {
+      background: #3b82f6;
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+
+<h2>Календарь бронирования</h2>
+
+<div class="controls">
+  <label>Год:
+    <select id="yearSelect"></select>
+  </label>
+  <label>Месяц:
+    <select id="monthSelect">
+      <option value="0">Январь</option><option value="1">Февраль</option>
+      <option value="2">Март</option><option value="3">Апрель</option>
+      <option value="4">Май</option><option value="5">Июнь</option>
+      <option value="6">Июль</option><option value="7">Август</option>
+      <option value="8">Сентябрь</option><option value="9">Октябрь</option>
+      <option value="10">Ноябрь</option><option value="11">Декабрь</option>
+    </select>
+  </label>
+  <input id="newRoomName" placeholder="Название квартиры" />
+  <button onclick="addRoom()">➕ Добавить объект </button>
+  <button class="export-btn" onclick="exportToCSV()">📥 Экспорт в CSV</button>
+</div>
+
+<div class="calendar">
+  <table id="calendarTable">
+    <thead><tr><th class="room-name">Квартира</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<!-- Модалка -->
+<div class="modal" id="bookingModal">
+  <div class="modal-content">
+    <input id="guestName"     placeholder="Имя арендатора">
+    <input id="guestPhone"    placeholder="Телефон">
+    <input id="priceTotal"    type="number" placeholder="Сумма всего">
+    <input id="pricePaid"     type="number" placeholder="Оплачено">
+
+    <!-- ДОБАВЛЕНО: Показ "Осталось" -->
+    <div id="remainingAmount" style="margin-top:5px;font-weight:bold;color:#1e40af;">
+      Осталось: 0
+    </div>
+
+    <input id="dateFrom"      type="date">
+    <input id="dateTo"        type="date">
+    <button class="save"  onclick="saveBooking()">💾 Сохранить</button>
+    <button class="delete"onclick="deleteBooking()">🗑 Удалить</button>
+  </div>
+</div>
+
+<script>
+let rooms = JSON.parse(localStorage.getItem('rooms') || '[]');
+if (rooms.length === 0) {
+  rooms = Array.from({ length: 15 }, (_, i) => `🌇 Апартаменты №${101 + i}`);
+}
+
+const monthSel = document.getElementById('monthSelect');
+const yearSel = document.getElementById('yearSelect');
+const table = document.getElementById('calendarTable');
+const modal = document.getElementById('bookingModal');
+
+let bookings = JSON.parse(localStorage.getItem('bookings') || '[]');
+let activeCell = null;
+let activeMonth = new Date().getMonth();
+let activeYear = new Date().getFullYear();
+
+function populateYears() {
+  const y = new Date().getFullYear();
+  for (let i = y - 5; i <= y + 5; i++) {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = i;
+    yearSel.appendChild(opt);
+  }
+  yearSel.value = activeYear;
+}
+
+function drawCalendar(m = activeMonth, y = activeYear) {
+  activeMonth = +m;
+  activeYear = +y;
+  const days = new Date(y, activeMonth + 1, 0).getDate();
+  const head = table.tHead.rows[0];
+  head.innerHTML = '<th class="room-name">Квартира</th>';
+  for (let d = 1; d <= days; d++) {
+    const th = document.createElement('th');
+    th.textContent = d.toString().padStart(2, '0');
+    head.append(th);
+  }
+
+  const body = table.tBodies[0];
+  body.innerHTML = '';
+  rooms.forEach((r, i) => {
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.textContent = r;
+    td.className = `room-name room-color-${i % 7}`;
+    td.onclick = () => renameRoom(i);
+    tr.append(td);
+    for (let d = 1; d <= days; d++) {
+      const c = document.createElement('td');
+      c.className = 'cell';
+      c.dataset.room = i;
+      c.dataset.day = d;
+      c.onclick = () => openModal(c);
+      tr.append(c);
+    }
+    body.append(tr);
+  });
+
+  paintBookings();
+}
+
+function addRoom() {
+  const name = document.getElementById('newRoomName').value.trim();
+  if (!name) return alert('Введите имя квартиры');
+  rooms.push(name);
+  localStorage.setItem('rooms', JSON.stringify(rooms));
+  drawCalendar();
+}
+
+function renameRoom(index) {
+  const newName = prompt('Введите новое имя для квартиры:', rooms[index]);
+  if (newName && newName.trim()) {
+    rooms[index] = newName.trim();
+    localStorage.setItem('rooms', JSON.stringify(rooms));
+    drawCalendar();
+  }
+}
+
+function paintBookings() {
+  document.querySelectorAll('td.cell').forEach(c => { c.className = 'cell'; c.textContent = '' });
+  bookings
+    .filter(b => b.month == activeMonth && b.year == activeYear)
+    .forEach(b => {
+      b.days.forEach(d => {
+        const row = table.tBodies[0].rows[b.room];
+        const cell = row.querySelector(`td[data-day="${d}"]`);
+        if (!cell) return;
+        const status = b.paid == 0 ? 'none' : (b.paid < b.total ? 'partial' : 'full');
+        cell.classList.add('occupied', status);
+        cell.innerHTML = `<span>${b.name}</span><span>${b.phone}</span>`;
+      });
+    });
+}
+
+function openModal(cell) {
+  activeCell = cell;
+  const r = +cell.dataset.room, d = +cell.dataset.day;
+  const exist = bookings.find(b => b.room === r && b.month == activeMonth && b.year == activeYear && b.days.includes(d));
+  document.getElementById('guestName').value = exist?.name || '';
+  document.getElementById('guestPhone').value = exist?.phone || '';
+  document.getElementById('priceTotal').value = exist?.total || '';
+  document.getElementById('pricePaid').value = exist?.paid || '';
+  document.getElementById('dateFrom').value = exist?.from || '';
+  document.getElementById('dateTo').value = exist?.to || '';
+  updateRemaining(); // обновить остаток при открытии
+  modal.style.display = 'flex';
+}
+function closeModal() { modal.style.display = 'none'; }
+
+function saveBooking() {
+  const room = +activeCell.dataset.room;
+  const name = document.getElementById('guestName').value.trim();
+  const phone = document.getElementById('guestPhone').value.trim();
+  const total = +document.getElementById('priceTotal').value;
+  const paid = +document.getElementById('pricePaid').value;
+  const from = document.getElementById('dateFrom').value;
+  const to = document.getElementById('dateTo').value;
+  if (!name || !phone || !from || !to || !total) {
+    alert('Заполните все поля');
+    return;
+  }
+  const d1 = new Date(from), d2 = new Date(to), days = [];
+  for (let d = d1.getDate(); d <= d2.getDate(); d++) days.push(d);
+  bookings = bookings.filter(b => !(b.room === room && b.month == activeMonth && b.year == activeYear && b.days.some(x => days.includes(x))));
+  bookings.push({ room, year: activeYear, month: activeMonth, name, phone, total, paid, from, to, days });
+  localStorage.setItem('bookings', JSON.stringify(bookings));
+  closeModal();
+  paintBookings();
+}
+
+function deleteBooking() {
+  if (!activeCell) return;
+  const room = +activeCell.dataset.room;
+  const day = +activeCell.dataset.day;
+  bookings = bookings.filter(b => !(b.room === room && b.month == activeMonth && b.year == activeYear && b.days.includes(day)));
+  localStorage.setItem('bookings', JSON.stringify(bookings));
+  closeModal();
+  paintBookings();
+}
+
+function exportToCSV() {
+  let csv = 'Квартира,День,Месяц,Год,Имя,Телефон,Оплачено,Всего\n';
+  bookings.forEach(b => {
+    b.days.forEach(d => {
+      csv += `${rooms[b.room]},${d},${+b.month + 1},${b.year},${b.name},${b.phone},${b.paid},${b.total}\n`;
+    });
+  });
+  const blob = new Blob([csv], { type: 'text/csv' }),
+    url = URL.createObjectURL(blob),
+    a = document.createElement('a');
+  a.href = url;
+  a.download = 'брони.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+yearSel.onchange = () => drawCalendar(monthSel.value, yearSel.value);
+monthSel.onchange = () => drawCalendar(monthSel.value, yearSel.value);
+modal.onclick = e => { if (e.target === modal) closeModal(); };
+
+populateYears();
+drawCalendar();
+
+
+// ДОБАВЛЕНО: Автообновление "Осталось"
+const totalInput = document.getElementById('priceTotal');
+const paidInput = document.getElementById('pricePaid');
+const remainingDiv = document.getElementById('remainingAmount');
+
+function updateRemaining() {
+  const total = Number(totalInput.value);
+  const paid = Number(paidInput.value);
+  const remaining = total - paid;
+  if (!isNaN(remaining)) {
+    remainingDiv.textContent = 'Осталось: ' + remaining;
+  }
+}
+
+totalInput.addEventListener('input', updateRemaining);
+paidInput.addEventListener('input', updateRemaining);
+</script>
+
+</body>
+</html>
